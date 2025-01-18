@@ -6,22 +6,17 @@
 
 #include "base/assert.hpp"
 #include "base/checked_cast.hpp"
-#include "base/logging.hpp"
-#include "base/macros.hpp"
 #include "base/string_utils.hpp"
 
-#include <initializer_list>
 #include <sstream>
-#include <utility>
-
-using namespace std;
 
 namespace routing
 {
+using namespace std;
 
 // RoutingOptions -------------------------------------------------------------------------------------
 
-string const RoutingOptions::kAvoidRoutingOptionSettingsForCar = "avoid_routing_options_car";
+std::string_view constexpr kAvoidRoutingOptionSettingsForCar = "avoid_routing_options_car";
 
 // static
 RoutingOptions RoutingOptions::LoadCarOptionsFromSettings()
@@ -61,14 +56,12 @@ RoutingOptionsClassifier::RoutingOptionsClassifier()
 {
   Classificator const & c = classif();
 
-  initializer_list<pair<vector<string>, RoutingOptions::Road>> const types = {
+  pair<vector<string>, RoutingOptions::Road> const types[] = {
     {{"highway", "motorway"},             RoutingOptions::Road::Motorway},
 
     {{"hwtag", "toll"},                   RoutingOptions::Road::Toll},
 
     {{"route", "ferry"},                  RoutingOptions::Road::Ferry},
-    {{"route", "ferry", "motorcar"},      RoutingOptions::Road::Ferry},
-    {{"route", "ferry", "motor_vehicle"}, RoutingOptions::Road::Ferry},
 
     {{"highway", "track"},                RoutingOptions::Road::Dirty},
     {{"highway", "road"},                 RoutingOptions::Road::Dirty},
@@ -76,23 +69,20 @@ RoutingOptionsClassifier::RoutingOptionsClassifier()
     {{"psurface", "unpaved_good"},        RoutingOptions::Road::Dirty}
   };
 
+  m_data.Reserve(std::size(types));
   for (auto const & data : types)
-  {
-    auto const & stringType = data.first;
-    auto const & optionType = data.second;
-
-    ASSERT_EQUAL(m_data.count(c.GetTypeByPath(stringType)), 0, ());
-    m_data[c.GetTypeByPath(stringType)] = optionType;
-  }
+    m_data.Insert(c.GetTypeByPath(data.first), data.second);
+  m_data.FinishBuilding();
 }
 
 optional<RoutingOptions::Road> RoutingOptionsClassifier::Get(uint32_t type) const
 {
-  auto const it = m_data.find(type);
-  if (it == m_data.cend())
-    return {};
+  ftype::TruncValue(type, 2); // in case of highway-motorway-bridge
 
-  return it->second;
+  auto const * res = m_data.Find(type);
+  if (res)
+    return *res;
+  return {};
 }
 
 RoutingOptionsClassifier const & RoutingOptionsClassifier::Instance()
@@ -101,9 +91,9 @@ RoutingOptionsClassifier const & RoutingOptionsClassifier::Instance()
   return instance;
 }
 
-RoutingOptions::Road ChooseMainRoutingOptionRoad(RoutingOptions options)
+RoutingOptions::Road ChooseMainRoutingOptionRoad(RoutingOptions options, bool isCarRouter)
 {
-  if (options.Has(RoutingOptions::Road::Toll))
+  if (isCarRouter && options.Has(RoutingOptions::Road::Toll))
     return RoutingOptions::Road::Toll;
 
   if (options.Has(RoutingOptions::Road::Ferry))
@@ -160,4 +150,16 @@ string DebugPrint(RoutingOptions::Road type)
 
   UNREACHABLE();
 }
+
+RoutingOptionSetter::RoutingOptionSetter(RoutingOptions::RoadType roadsMask)
+{
+  m_saved = RoutingOptions::LoadCarOptionsFromSettings();
+  RoutingOptions::SaveCarOptionsToSettings(RoutingOptions(roadsMask));
+}
+
+RoutingOptionSetter::~RoutingOptionSetter()
+{
+  RoutingOptions::SaveCarOptionsToSettings(m_saved);
+}
+
 }  // namespace routing

@@ -17,13 +17,13 @@ Checkpoints::Checkpoints(std::vector<m2::PointD> && points) : m_points(std::move
 
 void Checkpoints::SetPointFrom(m2::PointD const & point)
 {
-  CHECK_LESS(m_passedIdx, m_points.size(), ());
+  ASSERT_LESS(m_passedIdx, m_points.size(), ());
   m_points[m_passedIdx] = point;
 }
 
 m2::PointD const & Checkpoints::GetPoint(size_t pointIdx) const
 {
-  CHECK_LESS(pointIdx, m_points.size(), ());
+  ASSERT_LESS(pointIdx, m_points.size(), ());
   return m_points[pointIdx];
 }
 
@@ -56,13 +56,9 @@ double Checkpoints::GetSummaryLengthBetweenPointsMeters() const
 std::string DebugPrint(Checkpoints const & checkpoints)
 {
   std::ostringstream out;
-  out << std::fixed << std::setprecision(6);
   out << "Checkpoints(";
-  for (auto const & point : checkpoints.GetPoints())
-  {
-    auto const latlon = mercator::ToLatLon(point);
-    out << latlon.m_lat << ", " << latlon.m_lon << "; ";
-  }
+  for (auto const & pt : checkpoints.GetPoints())
+    out << DebugPrint(mercator::ToLatLon(pt)) << "; ";
   out << "passed: " << checkpoints.GetPassedIdx() << ")";
   return out.str();
 }

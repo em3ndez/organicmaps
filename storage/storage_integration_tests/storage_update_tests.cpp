@@ -19,21 +19,21 @@
 #include <memory>
 #include <string>
 
+namespace storage_update_tests
+{
 using namespace platform;
 using namespace std;
 using namespace storage;
 
-namespace
-{
 static FrameworkParams const kFrameworkParams(false /* m_enableDiffs */);
 
 string const kCountriesTxtFile = COUNTRIES_FILE;
 
 string const kMwmVersion1 = "190830";
-size_t const kCountriesTxtFileSize1 = 420632;
+//size_t const kCountriesTxtFileSize1 = 420632;
 
 string const kMwmVersion2 = "190910";
-size_t const kCountriesTxtFileSize2 = 420634;
+//size_t const kCountriesTxtFileSize2 = 420634;
 
 string const kGroupCountryId = "Belarus";
 
@@ -77,8 +77,6 @@ string GetMwmFilePath(string const & version, CountryId const & countryId)
 {
   return base::JoinPath(GetPlatform().WritableDir(), version, countryId + DATA_FILE_EXTENSION);
 }
-
-} // namespace
 
 /// @todo We don't have direct version links for now.
 /// Also Framework f(kFrameworkParams) will fail here, @see SmallMwms_3levels_Test.
@@ -192,3 +190,4 @@ UNIT_TEST(SmallMwms_Update_Test)
   }
 }
 */
+}  // namespace storage_update_tests

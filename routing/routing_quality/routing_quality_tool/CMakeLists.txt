@@ -1,9 +1,6 @@
 project(routing_quality_tool)
 
-include_directories(${OMIM_ROOT}/3party/gflags/src)
-
-set(
-  SRC
+set(SRC
   benchmark_results.cpp
   benchmark_results.hpp
   benchmark_stat.cpp
@@ -17,34 +14,9 @@ set(
 
 omim_add_executable(${PROJECT_NAME} ${SRC})
 
-omim_link_libraries(
-  ${PROJECT_NAME}
+target_link_libraries(${PROJECT_NAME}
   routing_quality
   routing_api
-  routes_builder
-  generator
-  routing
-  platform
-  traffic
-  routing_common
-  transit
-  storage
-  indexer
-  platform
-  mwm_diff
-  bsdiff
   kml
-  geometry
-  coding
-  base
-  icu
-  jansson
-  opening_hours
-  oauthcpp
-  protobuf
-  gflags
-  ${LIBZ}
+  gflags::gflags
 )
-
-link_qt5_core(${PROJECT_NAME})
-link_qt5_network(${PROJECT_NAME})

@@ -1,132 +1,76 @@
 #include "testing/testing.hpp"
 
 #include "platform/measurement_utils.hpp"
-#include "platform/settings.hpp"
 
 #include "base/math.hpp"
 
+#include <iostream>
 #include <string>
-#include <utility>
 
 using namespace measurement_utils;
-using namespace settings;
+using namespace platform;
 
-struct ScopedSettings
+std::string AddGroupingSeparators(std::string const & valueString, std::string const & groupingSeparator)
 {
-  ScopedSettings() { m_wasSet = Get(kMeasurementUnits, m_oldUnits); }
+  std::string out(valueString);
 
-  /// Saves/restores previous units and sets new units for a scope.
-  explicit ScopedSettings(Units newUnits) : ScopedSettings()
-  {
-    Set(kMeasurementUnits, newUnits);
-  }
+  if (out.size() > 4 && !groupingSeparator.empty())
+      for (int pos = out.size() - 3; pos > 0; pos -= 3)
+        out.insert(pos, groupingSeparator);
 
-  ~ScopedSettings()
-  {
-    if (m_wasSet)
-      Set(kMeasurementUnits, m_oldUnits);
-    else
-      Delete(kMeasurementUnits);
-  }
-
-  bool m_wasSet;
-  Units m_oldUnits;
-};
-
-UNIT_TEST(Measurement_Smoke)
-{
-  ScopedSettings guard(Units::Metric);
-
-  using Pair = std::pair<double, char const *>;
-
-  Pair arr[] = {
-    Pair(10.0, "10 m"),
-    Pair(10.4, "10 m"),
-    Pair(10.51, "11 m"),
-    Pair(1000.0, "1.0 km"),
-    Pair(1100.0, "1.1 km"),
-    Pair(1140.0, "1.1 km"),
-    Pair(1151.0, "1.2 km"),
-    Pair(1500.0, "1.5 km"),
-    Pair(1549.9, "1.5 km"),
-    Pair(1551.0, "1.6 km"),
-    Pair(10000.0, "10 km"),
-    Pair(10400.0, "10 km"),
-    Pair(10499.9, "10 km"),
-    Pair(10501.0, "11 km")
-  };
-
-  for (size_t i = 0; i < ARRAY_SIZE(arr); ++i)
-  {
-    std::string s;
-    TEST_EQUAL(FormatDistance(arr[i].first), arr[i].second, (arr[i]));
-  }
+  return out;
 }
 
 UNIT_TEST(LatLonToDMS_Origin)
 {
-  TEST_EQUAL(FormatLatLonAsDMS(0, 0), "00°00′00″ 00°00′00″", ());
-  TEST_EQUAL(FormatLatLonAsDMS(0, 0, 3), "00°00′00″ 00°00′00″", ());
+  TEST_EQUAL(FormatLatLonAsDMS(0, 0, false), "00°00′00″ 00°00′00″", ());
+  TEST_EQUAL(FormatLatLonAsDMS(0, 0, false, 3), "00°00′00″ 00°00′00″", ());
 }
 
 UNIT_TEST(LatLonToDMS_Rounding)
 {
   // Here and after data is from Wiki: http://bit.ly/datafotformatingtest
   // Boston
-  TEST_EQUAL(FormatLatLonAsDMS(42.358056, -71.063611, 0), "42°21′29″N 71°03′49″W", ());
+  TEST_EQUAL(FormatLatLonAsDMS(42.358056, -71.063611, false, 0), "42°21′29″N 71°03′49″W", ());
   // Minsk
-  TEST_EQUAL(FormatLatLonAsDMS(53.916667, 27.55, 0), "53°55′00″N 27°33′00″E", ());
+  TEST_EQUAL(FormatLatLonAsDMS(53.916667, 27.55, false, 0), "53°55′00″N 27°33′00″E", ());
   // Rio
-  TEST_EQUAL(FormatLatLonAsDMS(-22.908333, -43.196389, 0), "22°54′30″S 43°11′47″W", ());
+  TEST_EQUAL(FormatLatLonAsDMS(-22.908333, -43.196389, false, 0), "22°54′30″S 43°11′47″W", ());
 }
 
 UNIT_TEST(LatLonToDMS_NoRounding)
 {
   // Paris
-  TEST_EQUAL(FormatLatLonAsDMS(48.8567, 2.3508, 2), "48°51′24.12″N 02°21′02.88″E", ());
+  TEST_EQUAL(FormatLatLonAsDMS(48.8567, 2.3508, false, 2), "48°51′24.12″N 02°21′02.88″E", ());
   // Vatican
-  TEST_EQUAL(FormatLatLonAsDMS(41.904, 12.453, 2), "41°54′14.4″N 12°27′10.8″E", ());
+  TEST_EQUAL(FormatLatLonAsDMS(41.904, 12.453, false, 2), "41°54′14.4″N 12°27′10.8″E", ());
 
-  TEST_EQUAL(FormatLatLonAsDMS(21.981112, -159.371112, 2), "21°58′52″N 159°22′16″W", ());
+  TEST_EQUAL(FormatLatLonAsDMS(21.981112, -159.371112, false, 2), "21°58′52″N 159°22′16″W", ());
 }
 
-UNIT_TEST(FormatAltitude)
+UNIT_TEST(FormatOsmLink)
 {
-  ScopedSettings guard;
-  settings::Set(settings::kMeasurementUnits, Units::Imperial);
-  TEST_EQUAL(FormatAltitude(10000), "32808 ft", ());
-  settings::Set(settings::kMeasurementUnits, Units::Metric);
-  TEST_EQUAL(FormatAltitude(5), "5 m", ());
-}
+  // Zero point
+  TEST_EQUAL(FormatOsmLink(0, 0, 5), "https://osm.org/go/wAAAA-?m", ());
+  // Eifel tower
+  TEST_EQUAL(FormatOsmLink(48.85825, 2.29450, 15), "https://osm.org/go/0BOdUs9e--?m", ());
+  // Buenos Aires
+  TEST_EQUAL(FormatOsmLink(-34.6061, -58.4360, 10), "https://osm.org/go/Mnx6SB?m", ());
 
-UNIT_TEST(FormatSpeed)
-{
-  {
-    ScopedSettings guard(Units::Metric);
-    TEST_EQUAL(FormatSpeed(10), "36 km/h", ());
-    TEST_EQUAL(FormatSpeed(1), "3.6 km/h", ());
-  }
-
-  {
-    ScopedSettings guard(Units::Imperial);
-    TEST_EQUAL(FormatSpeed(10), "22 mph", ());
-    TEST_EQUAL(FormatSpeed(1), "2.2 mph", ());
-  }
+  // Formally, lat = -90 and lat = 90 are the same for OSM links, but Mercator is valid until 85.
+  auto link = FormatOsmLink(-90, -180, 10);
+  TEST(link == "https://osm.org/go/AAAAAA?m" || link == "https://osm.org/go/~~~~~~?m", (link));
+  link = FormatOsmLink(90, 180, 10);
+  TEST(link == "https://osm.org/go/AAAAAA?m" || link == "https://osm.org/go/~~~~~~?m", (link));
 }
 
 UNIT_TEST(FormatSpeedNumeric)
 {
   TEST_EQUAL(FormatSpeedNumeric(10, Units::Metric), "36", ());
-  TEST_EQUAL(FormatSpeedNumeric(1, Units::Metric), "3.6", ());
+  TEST_EQUAL(FormatSpeedNumeric(1, Units::Metric), "4", ());
 
   TEST_EQUAL(FormatSpeedNumeric(10, Units::Imperial), "22", ());
-  TEST_EQUAL(FormatSpeedNumeric(1, Units::Imperial), "2.2", ());
-}
-
-UNIT_TEST(FormatSpeedUnits)
-{
-  TEST_EQUAL(FormatSpeedUnits(Units::Metric), "km/h", ());
-  TEST_EQUAL(FormatSpeedUnits(Units::Imperial), "mph", ());
+  TEST_EQUAL(FormatSpeedNumeric(1, Units::Imperial), "2", ());
 }
 
 UNIT_TEST(OSMDistanceToMetersString)
@@ -191,9 +135,51 @@ UNIT_TEST(UnitsConversion)
   TEST(base::AlmostEqualAbs(MilesToMeters(MetersToMiles(1000.0)), 1000.0, kEps), ());
   TEST(base::AlmostEqualAbs(MilesToMeters(1.0), 1609.344, kEps), ());
 
-  TEST(base::AlmostEqualAbs(MphToKmph(KmphToMph(100.0)), 100.0, kEps), ());
-  TEST(base::AlmostEqualAbs(MphToKmph(100.0), 160.9344, kEps), (MphToKmph(100.0)));
+  TEST(base::AlmostEqualAbs(MiphToKmph(KmphToMiph(100.0)), 100.0, kEps), ());
+  TEST(base::AlmostEqualAbs(MiphToKmph(100.0), 160.9344, kEps), (MiphToKmph(100.0)));
 
   TEST(base::AlmostEqualAbs(ToSpeedKmPH(100.0, Units::Imperial), 160.9344, kEps), ());
   TEST(base::AlmostEqualAbs(ToSpeedKmPH(100.0, Units::Metric), 100.0, kEps), ());
+
+  TEST(base::AlmostEqualAbs(KmphToMps(3.6), 1.0, kEps), ());
+  TEST(base::AlmostEqualAbs(MpsToKmph(1.0), 3.6, kEps), ());
+}
+
+UNIT_TEST(ToStringPrecisionLocale)
+{
+  double d1 = 9.8;
+  int pr1 = 1;
+
+  double d2 = 12345.0;
+  int pr2 = 0;
+  std::string d2String("12345");
+
+  struct TestData
+  {
+    std::string localeName;
+    std::string d1String;
+  };
+
+  TestData testData[] = {
+          // Locale name ,   Decimal
+          { "en_US.UTF-8",   "9.8"},
+          { "es_ES.UTF-8",   "9,8"},
+          { "fr_FR.UTF-8",   "9,8"},
+          { "ru_RU.UTF-8",   "9,8"}
+  };
+
+  for (TestData const & data : testData)
+  {
+    Locale loc;
+
+    if (!GetLocale(data.localeName, loc))
+    {
+      std::cout << "Locale '" << data.localeName << "' not found!! Skipping test..." << std::endl;
+      continue;
+    }
+
+    TEST_EQUAL(measurement_utils::ToStringPrecisionLocale(loc, d1, pr1), data.d1String, ());
+    TEST_EQUAL(measurement_utils::ToStringPrecisionLocale(loc, d2, pr2),
+               AddGroupingSeparators(d2String, loc.m_groupingSeparator), ());
+  }
 }

@@ -3,10 +3,7 @@
 
 project(routing_consistency_tests)
 
-include_directories(${OMIM_ROOT}/3party/gflags/src)
-
-set(
-  SRC
+set(SRC
   ../routing_integration_tests/routing_test_tools.cpp
   routing_consistency_tests.cpp
 )
@@ -14,38 +11,8 @@ set(
 # Not using omim_add_test because we don't need testingmain.cpp
 omim_add_executable(${PROJECT_NAME} ${SRC})
 
-omim_link_libraries(
-  ${PROJECT_NAME}
+target_link_libraries(${PROJECT_NAME}
   map
-  ge0
-  routing
-  traffic
-  routing_common
-  transit
-  search
-  storage
-  mwm_diff
-  kml
-  editor
-  indexer
   platform
-  geometry
-  oauthcpp
-  opening_hours
-  coding
-  base
-  jansson
-  protobuf
-  bsdiff
-  succinct
-  generator
-  gflags
-  pugixml
-  icu
-  agg
-  ${Qt5Widgets_LIBRARIES}
-  ${LIBZ}
+  gflags::gflags
 )
-
-link_qt5_core(${PROJECT_NAME})
-link_qt5_network(${PROJECT_NAME})

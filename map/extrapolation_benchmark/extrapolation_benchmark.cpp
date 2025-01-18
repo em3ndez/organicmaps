@@ -22,8 +22,8 @@
 #include <utility>
 #include <vector>
 
-#include "3party/gflags/src/gflags/gflags.h"
-#include "3party/gflags/src/gflags/gflags_declare.h"
+#include <gflags/gflags.h>
+#include "gflags/gflags_declare.h"
 
 // This tool is written to estimate quality of location extrapolation. To launch the benchmark
 // you need tracks in csv file with the format described below. To generate the csv file
@@ -158,7 +158,7 @@ bool Parse(string const & pathToCsv, Tracks & tracks)
         return false;
       track.emplace_back(static_cast<double>(timestamp), lat, lon);
     }
-    tracks.push_back(move(track));
+    tracks.push_back(std::move(track));
   }
   csvStream.close();
   return true;
@@ -179,11 +179,11 @@ void GpsPointToGpsInfo(GpsPoint const gpsPoint, GpsInfo & gpsInfo)
 /// real track.
 int main(int argc, char * argv[])
 {
-  google::SetUsageMessage(
+  gflags::SetUsageMessage(
       "Location extrapolation benchmark. Cumulative moving average, variance and standard "
       "deviation for all extrapolation deviations from tracks passed in comma separated csv with "
       "csv_path.");
-  google::ParseCommandLineFlags(&argc, &argv, true);
+  gflags::ParseCommandLineFlags(&argc, &argv, true);
 
   if (FLAGS_csv_path.empty())
   {
@@ -317,7 +317,7 @@ int main(int argc, char * argv[])
       ("Cumulative moving average, variance and standard deviation for each extrapolation:"));
   for (size_t i = 0; i < extrapolationNumber; ++i)
   {
-    double const variance = squareMes.Get()[i].Get() - pow(mes.Get()[i].Get(), 2.0);
+    double const variance = squareMes.Get()[i].Get() - base::Pow2(mes.Get()[i].Get());
     LOG(LINFO,
         ("Extrapolation", i + 1, ",", Extrapolator::kExtrapolationPeriodMs * (i + 1),
          "seconds after point two. Cumulative moving average =", mes.Get()[i].Get(), "meters.",

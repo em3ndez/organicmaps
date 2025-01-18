@@ -14,22 +14,28 @@
 #include <cstdint>
 #include <vector>
 
-using namespace std;
 
 UNIT_TEST(Framework_ForEachFeatureAtPoint_And_Others)
 {
+  using namespace std;
+
   Framework frm(FrameworkParams(false /* m_enableDiffs */));
   frm.DeregisterAllMaps();
   frm.RegisterMap(platform::LocalCountryFile::MakeForTesting("minsk-pass"));
 
+  // May vary according to the new minsk-pass data.
   vector<char const *> types =
   {
     "highway|footway|",
-    "hwtag|yesfoot|",
     "hwtag|yesbicycle|",
-    "highway|service|parking_aisle|",
+    "psurface|paved_good|",
+
+    "highway|service|",
+    "psurface|paved_good|",
+
     "amenity|parking|",
-    "barrier|lift_gate|"
+
+    "barrier|lift_gate|",
   };
   frm.ForEachFeatureAtPoint([&](FeatureType & ft)
   {
@@ -37,25 +43,22 @@ UNIT_TEST(Framework_ForEachFeatureAtPoint_And_Others)
     {
       string const strType = classif().GetFullObjectName(type);
       auto found = find(types.begin(), types.end(), strType);
-      TEST(found != types.end(), ());
+      TEST(found != types.end(), (strType));
       types.erase(found);
     });
-  }, mercator::FromLatLon(53.882663, 27.537788));
-  TEST_EQUAL(0, types.size(), ());
+  }, mercator::FromLatLon(53.8826576, 27.5378385));
+  TEST_EQUAL(0, types.size(), (types));
 
   ftypes::IsBuildingChecker const & isBuilding = ftypes::IsBuildingChecker::Instance();
   {
     // Restaurant in the building.
     auto const id = frm.GetFeatureAtPoint(mercator::FromLatLon(53.89395, 27.567365));
     TEST(id.IsValid(), ());
-    frm.GetDataSource().ReadFeature(
-        [&](FeatureType & ft) {
-          string name;
-          ft.GetName(StringUtf8Multilang::kDefaultCode, name);
-          TEST_EQUAL("Родны Кут", name, ());
-          TEST(!isBuilding(ft), ());
-        },
-        id);
+    frm.GetDataSource().ReadFeature([&](FeatureType & ft)
+    {
+      TEST_EQUAL("Родны Кут", ft.GetName(StringUtf8Multilang::kDefaultCode), ());
+      TEST(!isBuilding(ft), ());
+    }, id);
   }
 
   {

@@ -1,14 +1,12 @@
+#include "mainwindow.hpp"
+
+#include "qt/qt_common/helpers.hpp"
+
 #include "map/framework.hpp"
 
-#include "openlr/openlr_match_quality/openlr_assessment_tool/mainwindow.hpp"
+#include <gflags/gflags.h>
 
-#include "3party/gflags/src/gflags/gflags.h"
-
-#include <cstdio>
-
-#include <QApplication>
-
-using namespace openlr;
+#include <QtWidgets/QApplication>
 
 namespace
 {
@@ -18,8 +16,8 @@ DEFINE_string(data_path, "", "Path to data directory");
 
 int main(int argc, char * argv[])
 {
-  google::SetUsageMessage("Visualize and check matched routes.");
-  google::ParseCommandLineFlags(&argc, &argv, true);
+  gflags::SetUsageMessage("Visualize and check matched routes.");
+  gflags::ParseCommandLineFlags(&argc, &argv, true);
 
   Platform & platform = GetPlatform();
   if (!FLAGS_resources_path.empty())
@@ -30,10 +28,12 @@ int main(int argc, char * argv[])
   Q_INIT_RESOURCE(resources_common);
   QApplication app(argc, argv);
 
+  qt::common::SetDefaultSurfaceFormat(app.platformName());
+
   FrameworkParams params;
 
   Framework framework(params);
-  MainWindow mainWindow(framework);
+  openlr::MainWindow mainWindow(framework);
 
   mainWindow.showMaximized();
 

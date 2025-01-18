@@ -20,8 +20,12 @@
 
 - (void)updateStatusBarStyle;
 
+- (void)migrateOAuthCredentials;
+
 - (void)performAction:(NSString *_Nonnull)action;
 
+- (void)openMenu;
+- (void)openSettings;
 - (void)openMapsDownloader:(MWMMapDownloaderMode)mode;
 - (void)openEditor;
 - (void)openBookmarkEditor;
@@ -29,7 +33,6 @@
 - (void)searchText:(NSString *_Nonnull)text;
 - (void)openDrivingOptions;
 
-- (void)showRemoveAds;
 - (void)setPlacePageTopBound:(CGFloat)bound duration:(double)duration;
 
 + (void)setViewport:(double)lat lon:(double)lon zoomLevel:(int)zoomlevel;
@@ -48,5 +51,6 @@
 @property(strong, nonatomic) IBOutlet EAGLView * _Nonnull mapView;
 @property(strong, nonatomic) IBOutlet UIView * _Nonnull controlsView;
 @property(strong, nonatomic) IBOutlet UIView * _Nonnull searchViewContainer;
+@property(strong, nonatomic) IBOutlet NSLayoutConstraint * _Nonnull searchViewContainerLeadingConstraint;
 
 @end

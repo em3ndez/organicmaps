@@ -13,6 +13,18 @@ namespace routing
 {
 double constexpr kProgressInterval = 0.5;
 
+#ifdef DEBUG
+inline void DebugRoutingState(...) {}
+
+class JointSegment;
+class RouteWeight;
+class Segment;
+void DebugRoutingState(Segment const & vertex, std::optional<Segment> const & parent,
+                       RouteWeight const & heuristic, RouteWeight const & distance);
+void DebugRoutingState(JointSegment const & vertex, std::optional<JointSegment> const & parent,
+                       RouteWeight const & heuristic, RouteWeight const & distance);
+#endif
+
 template <typename Graph>
 class JunctionVisitor
 {
@@ -27,6 +39,20 @@ public:
       m_lastProgressPercent = progress->GetLastPercent();
   }
 
+  /// @param[in]  p   { Current state, Step context } pair.
+  /// @param[in]  to  End vertex (final for forward and start for backward waves).
+  template <class StateContextPair> void operator()(StateContextPair const & p, Vertex const & to)
+  {
+    auto const & state = p.first;
+#ifdef DEBUG
+    // For Debug purpose.
+    DebugRoutingState(state.vertex, p.second->GetParent(state.vertex), state.heuristic, state.distance);
+#endif
+    this->operator()(state.vertex, to);
+  }
+
+  /// @param[in]  from  Current processing vertex.
+  /// @param[in]  to    End vertex (final for forward and start for backward waves).
   void operator()(Vertex const & from, Vertex const & to)
   {
     ++m_visitCounter;

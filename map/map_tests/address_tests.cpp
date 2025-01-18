@@ -15,12 +15,12 @@
 #include <memory>
 #include <string>
 
+namespace address_tests
+{
 using namespace search;
 using namespace platform;
 
-namespace
-{
-void TestAddress(ReverseGeocoder & coder, ms::LatLon const & ll, std::string const & street,
+void TestAddress(ReverseGeocoder & coder, ms::LatLon const & ll, std::string_view street,
                  std::string const & houseNumber)
 {
   ReverseGeocoder::Address addr;
@@ -38,14 +38,12 @@ void TestAddress(ReverseGeocoder & coder, ms::LatLon const & ll, std::string con
 void TestAddress(ReverseGeocoder & coder, std::shared_ptr<MwmInfo> mwmInfo, ms::LatLon const & ll,
                  StringUtf8Multilang const & streetNames, std::string const & houseNumber)
 {
-  std::string streetName;
-  auto const deviceLang = StringUtf8Multilang::GetLangIndex(languages::GetCurrentNorm());
-  feature::GetReadableName(mwmInfo->GetRegionData(), streetNames, deviceLang,
-                           false /* allowTranslit */, streetName);
+  feature::NameParamsOut out;
+  feature::GetReadableName({ streetNames, mwmInfo->GetRegionData(), languages::GetCurrentMapLanguage(),
+                             false /* allowTranslit */ }, out);
 
-  TestAddress(coder, ll, streetName, houseNumber);
+  TestAddress(coder, ll, out.primary, houseNumber);
 }
-} // namespace
 
 UNIT_TEST(ReverseGeocoder_Smoke)
 {
@@ -63,7 +61,7 @@ UNIT_TEST(ReverseGeocoder_Smoke)
 
   ReverseGeocoder coder(dataSource);
 
-  auto const currentLocale = languages::GetCurrentNorm();
+  auto const currentLocale = languages::GetCurrentMapLanguage();
 
   {
     StringUtf8Multilang streetNames;
@@ -79,7 +77,7 @@ UNIT_TEST(ReverseGeocoder_Smoke)
     streetNames.AddString("int_name", "vulica Niamiha");
     streetNames.AddString("be", "вуліца Няміга");
     streetNames.AddString("ru", "улица Немига");
-    TestAddress(coder, mwmInfo, {53.89953, 27.54189}, streetNames, "42");
+    TestAddress(coder, mwmInfo, {53.8997617, 27.5429365}, streetNames, "40");
   }
   {
     StringUtf8Multilang streetNames;
@@ -106,3 +104,4 @@ UNIT_TEST(ReverseGeocoder_Smoke)
     TestAddress(coder, mwmInfo, {53.89745, 27.55835}, streetNames, "18А");
   }
 }
+} // namespace address_tests

@@ -1,12 +1,11 @@
 #include "routing/regions_router.hpp"
 
 #include "routing/dummy_world_graph.hpp"
+#include "routing/index_graph_starter.hpp"
 #include "routing/index_graph_loader.hpp"
 #include "routing/junction_visitor.hpp"
 #include "routing/regions_sparse_graph.hpp"
 #include "routing/routing_helpers.hpp"
-
-#include "routing_common/car_model.hpp"
 
 #include "base/scope_guard.hpp"
 
@@ -59,8 +58,16 @@ RouterResultCode RegionsRouter::CalculateSubrouteNoLeapsMode(IndexGraphStarter &
   Visitor visitor(starter, m_delegate, kVisitPeriod, progress);
 
   AStarAlgorithm<Vertex, Edge, Weight>::Params<Visitor, AStarLengthChecker> params(
-      starter, starter.GetStartSegment(), starter.GetFinishSegment(), nullptr /* prevRoute */,
+      starter, starter.GetStartSegment(), starter.GetFinishSegment(),
       m_delegate.GetCancellable(), std::move(visitor), AStarLengthChecker(starter));
+
+  params.m_badReducedWeight = [](Weight const & reduced, Weight const & current)
+  {
+    // https://github.com/organicmaps/organicmaps/issues/333
+    // Better to check relative error in cross-mwm regions graph, because it stores weights
+    // in rounded meters, and we observe accumulated error like 5m per ~3500km.
+    return fabs(reduced.GetWeight() / current.GetWeight()) > 1.0E-5;
+  };
 
   RoutingResult<Vertex, Weight> routingResult;
 
@@ -79,28 +86,24 @@ void RegionsRouter::Do()
 {
   m_mwmNames.clear();
 
-  RegionsSparseGraph sparseGraph(m_countryFileGetterFn, m_numMwmIds, m_dataSource);
-  sparseGraph.LoadRegionsSparseGraph();
+  auto sparseGraph = std::make_shared<RegionsSparseGraph>(m_countryFileGetterFn, m_numMwmIds, m_dataSource);
+  sparseGraph->LoadRegionsSparseGraph();
 
   std::unique_ptr<WorldGraph> graph = std::make_unique<DummyWorldGraph>();
 
-  std::unique_ptr<IndexGraphStarter> starter;
-
   for (size_t i = 0; i < m_checkpoints.GetNumSubroutes(); ++i)
   {
-    auto const & [pointFrom, mwmFrom] = GetCheckpointRegion(i);
-    auto const & [pointTo, mwmTo] = GetCheckpointRegion(i + 1);
-
-    if (mwmFrom == mwmTo)
+    // equal mwm ids
+    if (GetCheckpointRegion(i).second == GetCheckpointRegion(i + 1).second)
       continue;
 
     std::optional<FakeEnding> const startFakeEnding =
-        sparseGraph.GetFakeEnding(m_checkpoints.GetPoint(i));
+        sparseGraph->GetFakeEnding(m_checkpoints.GetPoint(i));
     if (!startFakeEnding)
       return;
 
     std::optional<FakeEnding> const finishFakeEnding =
-        sparseGraph.GetFakeEnding(m_checkpoints.GetPoint(i + 1));
+        sparseGraph->GetFakeEnding(m_checkpoints.GetPoint(i + 1));
     if (!finishFakeEnding)
       return;
 
@@ -110,7 +113,7 @@ void RegionsRouter::Do()
 
     subrouteStarter.GetGraph().SetMode(WorldGraphMode::NoLeaps);
 
-    subrouteStarter.SetRegionsGraphMode(std::make_shared<RegionsSparseGraph>(sparseGraph));
+    subrouteStarter.SetRegionsGraphMode(sparseGraph);
 
     std::vector<Segment> subroute;
 
@@ -124,9 +127,9 @@ void RegionsRouter::Do()
     {
       for (bool front : {false, true})
       {
-        LatLonWithAltitude const & point = subrouteStarter.GetJunction(s, front);
-        std::string name = m_countryFileGetterFn(mercator::FromLatLon(point.GetLatLon()));
+        auto const & ll = subrouteStarter.GetJunction(s, front).GetLatLon();
 
+        std::string name = m_countryFileGetterFn(mercator::FromLatLon(ll));
         if (name.empty() && !IndexGraphStarter::IsFakeSegment(s))
           name = m_numMwmIds->GetFile(s.GetMwmId()).GetName();
 

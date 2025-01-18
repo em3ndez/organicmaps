@@ -1,30 +1,27 @@
 #include "storage/pinger.hpp"
 
 #include "platform/http_client.hpp"
-#include "platform/preferred_languages.hpp"
 
 #include "base/assert.hpp"
 #include "base/logging.hpp"
-#include "base/stl_helpers.hpp"
 #include "base/thread_pool_delayed.hpp"
 
 #include <chrono>
-#include <map>
 
 
-using namespace std;
-using namespace std::chrono;
-
-namespace
+namespace pinger
 {
 auto constexpr kTimeoutInSeconds = 4.0;
+int64_t constexpr kInvalidPing = -1;
 
-int64_t DoPing(string const & url)
+int64_t DoPing(std::string const & url)
 {
+  using namespace std::chrono;
+
   if (url.empty())
   {
     ASSERT(false, ("Metaserver returned an empty url."));
-    return -1;
+    return kInvalidPing;
   }
 
   platform::HttpClient request(url);
@@ -40,37 +37,42 @@ int64_t DoPing(string const & url)
     LOG(LWARNING, ("Request to server", url, "failed with code =", request.ErrorCode(), "; redirection =", request.WasRedirected()));
   }
 
-  return -1;
+  return kInvalidPing;
 }
-}  // namespace
+} // namespace pinger
 
 namespace storage
 {
 // static
-Pinger::Endpoints Pinger::ExcludeUnavailableEndpoints(Endpoints const & urls)
+Pinger::Endpoints Pinger::ExcludeUnavailableAndSortEndpoints(Endpoints const & urls)
 {
-  using base::thread_pool::delayed::ThreadPool;
-
   auto const size = urls.size();
   CHECK_GREATER(size, 0, ());
 
-  map<int64_t, size_t> timeUrls;
+  using EntryT = std::pair<int64_t, size_t>;
+  std::vector<EntryT> timeUrls(size, {pinger::kInvalidPing, 0});
   {
-    ThreadPool t(size, ThreadPool::Exit::ExecPending);
+    base::DelayedThreadPool pool(size, base::DelayedThreadPool::Exit::ExecPending);
     for (size_t i = 0; i < size; ++i)
     {
-      t.Push([&urls, &timeUrls, i]
+      pool.Push([&urls, &timeUrls, i]
       {
-        auto const pingTime = DoPing(urls[i]);
-        if (pingTime > 0)
-          timeUrls[pingTime] = i;
+        timeUrls[i] = { pinger::DoPing(urls[i]), i };
       });
     }
   }
 
+  std::sort(timeUrls.begin(), timeUrls.end(), [](EntryT const & e1, EntryT const & e2)
+  {
+    return e1.first < e2.first;
+  });
+
   Endpoints readyUrls;
-  for (auto const & [_, index] : timeUrls)
-    readyUrls.push_back(urls[index]);
+  for (auto const & [ping, index] : timeUrls)
+  {
+    if (ping >= 0)
+      readyUrls.push_back(urls[index]);
+  }
 
   return readyUrls;
 }

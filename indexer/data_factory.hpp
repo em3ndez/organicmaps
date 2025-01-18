@@ -8,7 +8,6 @@
 #include <memory>
 
 class FilesContainerR;
-class IntervalIndexIFace;
 
 class IndexFactory
 {
@@ -22,11 +21,11 @@ public:
   inline version::MwmVersion const & GetMwmVersion() const { return m_version; }
   inline feature::DataHeader const & GetHeader() const { return m_header; }
   inline feature::RegionData const & GetRegionData() const { return m_regionData; }
+  inline void MoveRegionData(feature::RegionData & data) { data = std::move(m_regionData); }
 
   template <typename Reader>
   std::unique_ptr<IntervalIndex<Reader, uint32_t>> CreateIndex(Reader const & reader) const
   {
-    CHECK_NOT_EQUAL(m_version.GetFormat(), version::Format::v1, ("Old maps format is not supported"));
     return std::make_unique<IntervalIndex<Reader, uint32_t>>(reader);
   }
 };

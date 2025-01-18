@@ -10,20 +10,23 @@ namespace ms
 class LatLon
 {
 public:
-  static double const kMinLat;
-  static double const kMaxLat;
-  static double const kMinLon;
-  static double const kMaxLon;
-  static LatLon const kInvalidValue;
+  static double constexpr kMinLat = -90.0;
+  static double constexpr kMaxLat = 90.0;
+  static double constexpr kMinLon = -180.0;
+  static double constexpr kMaxLon = 180.0;
+  static double constexpr kInvalid = -1000.0;
 
-  double m_lat = kInvalidValue.m_lat;
-  double m_lon = kInvalidValue.m_lon;
+  // Default values are invalid.
+  double m_lat = kInvalid;
+  double m_lon = kInvalid;
 
   LatLon() = default;
   LatLon(double lat, double lon) : m_lat(lat), m_lon(lon) {}
 
+  static LatLon Invalid() { return LatLon(kInvalid, kInvalid); }
   static LatLon Zero() { return LatLon(0.0, 0.0); }
 
+  bool IsValid() const { return m_lat != kInvalid && m_lon != kInvalid; }
   bool operator==(ms::LatLon const & rhs) const;
   bool operator<(ms::LatLon const & rhs) const;
 

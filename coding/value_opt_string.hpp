@@ -5,33 +5,21 @@
 #include "base/string_utils.hpp"
 #include "base/assert.hpp"
 
-#include <cstddef>
-#include <cstdint>
 #include <limits>
 #include <string>
 
 class StringNumericOptimal
 {
 public:
-  bool operator==(StringNumericOptimal const & rhs) const { return m_s == rhs.m_s; }
+  bool operator==(StringNumericOptimal const & rhs) const
+  {
+    return m_s == rhs.m_s;
+  }
 
   void Set(std::string const & s)
   {
     CHECK(!s.empty(), ());
     m_s = s;
-  }
-
-  void Set(char const * p)
-  {
-    m_s = p;
-    CHECK(!m_s.empty(), ());
-  }
-
-  template <typename T>
-  void Set(T const & s)
-  {
-    m_s = strings::to_string(s);
-    CHECK(!m_s.empty(), ());
   }
 
   void Clear() { m_s.clear(); }
@@ -44,9 +32,8 @@ public:
   template <typename Sink>
   void Write(Sink & sink) const
   {
-    // If string is a number and we have space for control bit
     uint64_t n;
-    if (strings::to_uint64(m_s, n) && ((n << 1) >> 1) == n)
+    if (ToInt(n) && (m_s.size() == 1 || m_s.front() != '0'))
       WriteVarUint(sink, ((n << 1) | 1));
     else
     {
@@ -76,6 +63,12 @@ public:
   }
 
 private:
+  bool ToInt(uint64_t & n) const
+  {
+    // If string is a number and we have space for control bit
+    return (strings::to_uint64(m_s, n) && ((n << 1) >> 1) == n);
+  }
+
   std::string m_s;
 };
 

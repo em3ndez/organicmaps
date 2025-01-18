@@ -67,7 +67,7 @@ namespace feature
     static std::unique_ptr<FeaturesOffsetsTable> Load(std::string const & filePath);
 
     static std::unique_ptr<FeaturesOffsetsTable> Load(FilesContainerR const & cont);
-    static void Build(ModelReaderPtr & reader, std::string const & storePath);
+    static void Build(FilesContainerR const & cont, std::string const & storePath);
 
     FeaturesOffsetsTable(FeaturesOffsetsTable const &) = delete;
     FeaturesOffsetsTable const & operator=(FeaturesOffsetsTable const &) = delete;
@@ -103,8 +103,8 @@ namespace feature
     succinct::elias_fano m_table;
     std::unique_ptr<MmapReader> m_pReader;
 
-    detail::MappedFile m_file;
-    detail::MappedFile::Handle m_handle;
+    ::detail::MappedFile m_file;
+    ::detail::MappedFile::Handle m_handle;
   };
 
   // Builds feature offsets table in an mwm or rebuilds an existing

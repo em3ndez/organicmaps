@@ -20,9 +20,8 @@
 #include <unordered_map>
 #include <vector>
 
-#include "3party/gflags/src/gflags/gflags.h"
+#include <gflags/gflags.h>
 
-using namespace routing;
 
 DEFINE_string(path_resources, "", "OMaps resources directory");
 DEFINE_string(path_roads_file, "", "OSM file in o5m format.");
@@ -30,15 +29,17 @@ DEFINE_string(path_res_file, "", "Path to the resulting file with roads for gene
 
 int main(int argc, char ** argv)
 {
-  google::SetUsageMessage(
+  using namespace routing;
+
+  gflags::SetUsageMessage(
       "Reads OSM file, generates text file with main cross-mwm roads for generator_tool.");
-  google::ParseCommandLineFlags(&argc, &argv, true);
-  auto const toolName = base::GetNameFromFullPath(argv[0]);
+  gflags::ParseCommandLineFlags(&argc, &argv, true);
+  auto const toolName = base::FileNameFromFullPath(argv[0]);
 
   if (FLAGS_path_resources.empty() || !Platform::IsDirectory(FLAGS_path_resources) ||
       FLAGS_path_roads_file.empty() || FLAGS_path_res_file.empty())
   {
-    google::ShowUsageWithFlagsRestrict(argv[0], toolName.c_str());
+    gflags::ShowUsageWithFlagsRestrict(argv[0], toolName.c_str());
     return EXIT_FAILURE;
   }
 
@@ -55,7 +56,6 @@ int main(int argc, char ** argv)
   RoadsFromOsm const & roadsFromOsm = GetRoadsFromOsm(reader, mwmMatcher, highwayTypes);
 
   storage::Storage storage;
-  storage.RegisterAllLocalMaps(false /* enableDiffs */);
   std::shared_ptr<NumMwmIds> numMwmIds = CreateNumMwmIds(storage);
 
   std::unordered_map<std::string, NumMwmId> regionsToIds;

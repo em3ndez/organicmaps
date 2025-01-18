@@ -2,6 +2,8 @@
 
 #include "generator/utils.hpp"
 
+#include "traffic/traffic_cache.hpp"
+
 #include "routing/index_router.hpp"
 #include "routing/road_graph.hpp"
 #include "routing/routing_exceptions.hpp"
@@ -88,10 +90,7 @@ std::vector<routing::Edge> GetBestPedestrianEdges(D const & destination, C && co
     if (countryFileGetter(destination.GetPoint()) != countryId)
       return edges;
 
-    bool dummy = false;
-    indexRouter.FindBestEdges(destination.GetPoint(), platform::CountryFile(countryId),
-                              m2::PointD::Zero() /* direction */, true /* isOutgoing */,
-                              FeaturesRoadGraph::kClosestEdgesRadiusM, *worldGraph, edges, dummy);
+    indexRouter.GetBestOutgoingEdges(destination.GetPoint(), *worldGraph, edges);
     return edges;
   }
   catch (MwmIsNotAliveException const & e)
@@ -198,7 +197,7 @@ EdgeIdToFeatureId BuildTransit(std::string const & mwmDir, CountryId const & cou
 
   // Transit graph numerates features according to their orderto their order..
   EdgeIdToFeatureId edgeToFeature;
-  for (size_t i = 0; i < data.GetEdges().size(); ++i)
+  for (uint32_t i = 0; i < data.GetEdges().size(); ++i)
   {
     auto const & e = data.GetEdges()[i];
     EdgeId id(e.GetStop1Id(), e.GetStop2Id(), e.GetLineId());

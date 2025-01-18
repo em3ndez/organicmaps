@@ -1,11 +1,9 @@
 #include "qt/update_dialog.hpp"
-#include "qt/info_dialog.hpp"
 
 #include "storage/downloader_search_params.hpp"
 #include "storage/storage_defines.hpp"
 
 #include "platform/downloader_defines.hpp"
-#include "platform/settings.hpp"
 
 #include "base/assert.hpp"
 #include "base/logging.hpp"
@@ -73,7 +71,7 @@ namespace qt
 
     QPushButton * closeButton = new QPushButton(QObject::tr("Close"), this);
     closeButton->setDefault(true);
-    connect(closeButton, SIGNAL(clicked()), this, SLOT(OnCloseClick()));
+    connect(closeButton, &QAbstractButton::clicked, this, &UpdateDialog::OnCloseClick);
 
     m_tree = new QTreeWidget(this);
     m_tree->setColumnCount(KNumberOfColumns);
@@ -89,7 +87,7 @@ namespace qt
     m_tree->header()->setSectionResizeMode(KColumnIndexPositionInRanking,
                                            QHeaderView::ResizeToContents);
 
-    connect(m_tree, SIGNAL(itemClicked(QTreeWidgetItem *, int)), this, SLOT(OnItemClick(QTreeWidgetItem *, int)));
+    connect(m_tree, &QTreeWidget::itemClicked, this, &UpdateDialog::OnItemClick);
 
     QHBoxLayout * horizontalLayout = new QHBoxLayout();
     horizontalLayout->addStretch();
@@ -98,13 +96,11 @@ namespace qt
     QLabel * localeLabel = new QLabel(tr("locale:"));
     QLineEdit * localeEdit = new QLineEdit(this);
     localeEdit->setText(m_locale.c_str());
-    connect(localeEdit, SIGNAL(textChanged(QString const &)), this,
-            SLOT(OnLocaleTextChanged(QString const &)));
+    connect(localeEdit, &QLineEdit::textChanged, this, &UpdateDialog::OnLocaleTextChanged);
 
     QLabel * queryLabel = new QLabel(tr("search query:"));
     QLineEdit * queryEdit = new QLineEdit(this);
-    connect(queryEdit, SIGNAL(textChanged(QString const &)), this,
-            SLOT(OnQueryTextChanged(QString const &)));
+    connect(queryEdit, &QLineEdit::textChanged, this, &UpdateDialog::OnQueryTextChanged);
 
     QGridLayout * inputLayout = new QGridLayout();
     // widget, row, column
@@ -228,7 +224,7 @@ namespace qt
 
   void UpdateDialog::OnLocaleTextChanged(QString const & text)
   {
-    m_locale.assign(text.toUtf8().constData());
+    m_locale.assign(text.toStdString());
     strings::Trim(m_locale);
 
     RefillTree();
@@ -236,7 +232,7 @@ namespace qt
 
   void UpdateDialog::OnQueryTextChanged(QString const & text)
   {
-    m_query.assign(text.toUtf8().constData());
+    m_query.assign(text.toStdString());
 
     RefillTree();
   }
@@ -260,25 +256,25 @@ namespace qt
 
     auto const timestamp = m_fillTreeTimestamp;
 
-    DownloaderSearchParams params;
-    params.m_query = m_query;
-    params.m_inputLocale = m_locale;
-    auto const query = m_query;
-
-    params.m_onResults = [this, timestamp, query](DownloaderSearchResults const & results) {
-      Filter filter;
-      for (size_t i = 0; i < results.m_results.size(); ++i)
+    DownloaderSearchParams params{
+      m_query, m_locale,
+      // m_onResults
+      [this, timestamp](DownloaderSearchResults const & results)
       {
-        auto const & res = results.m_results[i];
-        auto const added = filter.emplace(res.m_countryId, make_pair(i + 1, res.m_matchedName));
-        if (!added.second)
-          LOG(LWARNING, ("Duplicate CountryId in results for query:", query));
-      }
+        Filter filter;
+        for (size_t i = 0; i < results.m_results.size(); ++i)
+        {
+          auto const & res = results.m_results[i];
+          auto const added = filter.emplace(res.m_countryId, make_pair(i + 1, res.m_matchedName));
+          if (!added.second)
+            LOG(LWARNING, ("Duplicate CountryId in results for query:", results.m_query));
+        }
 
-      FillTree(filter, timestamp);
+        FillTree(filter, timestamp);
+      }
     };
 
-    m_framework.GetSearchAPI().SearchInDownloader(params);
+    m_framework.GetSearchAPI().SearchInDownloader(std::move(params));
   }
 
   void UpdateDialog::FillTree(optional<Filter> const & filter, uint64_t timestamp)
@@ -363,7 +359,7 @@ namespace qt
   void SetRowColor(QTreeWidgetItem & item, QColor const & color)
   {
     for (int column = 0; column < item.columnCount(); ++column)
-      item.setTextColor(column, color);
+      item.setForeground(column, color);
   }
 
   void UpdateDialog::UpdateRowWithCountryInfo(CountryId const & countryId)
@@ -501,7 +497,7 @@ namespace qt
 
   CountryId UpdateDialog::GetCountryIdByTreeItem(QTreeWidgetItem * item)
   {
-    return item->data(KColumnIndexCountry, Qt::UserRole).toString().toUtf8().constData();
+    return item->data(KColumnIndexCountry, Qt::UserRole).toString().toStdString();
   }
 
   void UpdateDialog::OnCountryChanged(CountryId const & countryId)

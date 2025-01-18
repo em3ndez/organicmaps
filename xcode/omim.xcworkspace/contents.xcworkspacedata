@@ -52,13 +52,13 @@
          location = "container:icu/icu.xcodeproj">
       </FileRef>
       <FileRef
+         location = "container:harfbuzz/harfbuzz.xcodeproj">
+      </FileRef>
+      <FileRef
          location = "container:jansson/jansson.xcodeproj">
       </FileRef>
       <FileRef
          location = "container:minizip/minizip.xcodeproj">
-      </FileRef>
-      <FileRef
-         location = "container:oauthcpp/oauthcpp.xcodeproj">
       </FileRef>
       <FileRef
          location = "container:open_location_code/open_location_code.xcodeproj">
@@ -76,9 +76,6 @@
          location = "container:pugixml/pugixml.xcodeproj">
       </FileRef>
       <FileRef
-         location = "container:sdf_image/sdf_image.xcodeproj">
-      </FileRef>
-      <FileRef
          location = "container:stb_image/stb_image.xcodeproj">
       </FileRef>
       <FileRef
@@ -92,13 +89,13 @@
       </FileRef>
    </Group>
    <FileRef
-      location = "container:ge0/ge0.xcodeproj">
-   </FileRef>
-   <FileRef
       location = "container:base/base.xcodeproj">
    </FileRef>
    <FileRef
       location = "container:coding/coding.xcodeproj">
+   </FileRef>
+   <FileRef
+      location = "container:cppjansson/cppjansson.xcodeproj">
    </FileRef>
    <FileRef
       location = "group:descriptions/descriptions.xcodeproj">
@@ -110,31 +107,28 @@
       location = "container:drape_frontend/drape_frontend.xcodeproj">
    </FileRef>
    <FileRef
-      location = "group:shaders/shaders.xcodeproj">
-   </FileRef>
-   <FileRef
       location = "container:editor/editor.xcodeproj">
    </FileRef>
    <FileRef
-      location = "container:geometry/geometry.xcodeproj">
+      location = "container:ge0/ge0.xcodeproj">
    </FileRef>
    <FileRef
       location = "container:generator/generator.xcodeproj">
    </FileRef>
    <FileRef
-      location = "container:mwm_diff/mwm_diff.xcodeproj">
-   </FileRef>
-   <FileRef
-      location = "container:generator_tool/generator_tool.xcodeproj">
+      location = "container:geometry/geometry.xcodeproj">
    </FileRef>
    <FileRef
       location = "container:indexer/indexer.xcodeproj">
    </FileRef>
    <FileRef
+      location = "container:kml/kml.xcodeproj">
+   </FileRef>
+   <FileRef
       location = "container:map/map.xcodeproj">
    </FileRef>
    <FileRef
-      location = "container:mapshot/mapshot.xcodeproj">
+      location = "container:mwm_diff/mwm_diff.xcodeproj">
    </FileRef>
    <FileRef
       location = "container:openlr/openlr.xcodeproj">
@@ -152,36 +146,30 @@
       location = "container:search/search.xcodeproj">
    </FileRef>
    <FileRef
-      location = "container:storage/storage.xcodeproj">
+      location = "group:shaders/shaders.xcodeproj">
    </FileRef>
    <FileRef
-      location = "container:traffic/traffic.xcodeproj">
+      location = "container:storage/storage.xcodeproj">
    </FileRef>
    <FileRef
       location = "container:tracking/tracking.xcodeproj">
    </FileRef>
    <FileRef
+      location = "container:traffic/traffic.xcodeproj">
+   </FileRef>
+   <FileRef
       location = "group:transit/transit.xcodeproj">
-   </FileRef>
-   <FileRef
-      location = "container:qtMapsMe/qtMapsMe.xcodeproj">
-   </FileRef>
-   <FileRef
-      location = "container:software_renderer/software_renderer.xcodeproj">
-   </FileRef>
-   <FileRef
-      location = "container:kml/kml.xcodeproj">
-   </FileRef>
-   <FileRef
-      location = "group:../iphone/CoreApi/CoreApi.xcodeproj">
-   </FileRef>
-   <FileRef
-      location = "group:../iphone/Maps/Maps.xcodeproj">
    </FileRef>
    <FileRef
       location = "group:../iphone/Chart/Chart.xcodeproj">
    </FileRef>
    <FileRef
+      location = "group:../iphone/CoreApi/CoreApi.xcodeproj">
+   </FileRef>
+   <FileRef
       location = "group:../iphone/DatePicker/DatePicker.xcodeproj">
+   </FileRef>
+   <FileRef
+      location = "group:../iphone/Maps/Maps.xcodeproj">
    </FileRef>
 </Workspace>

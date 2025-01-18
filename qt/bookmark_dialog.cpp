@@ -5,8 +5,6 @@
 
 #include "platform/measurement_utils.hpp"
 
-#include "base/assert.hpp"
-
 #include <QtCore/QFile>
 
 #include <QtWidgets/QFileDialog>
@@ -18,12 +16,11 @@
 #include <QtWidgets/QTreeWidget>
 #include <QtWidgets/QVBoxLayout>
 
-#include <functional>
-
-using namespace std::placeholders;
 
 namespace qt
 {
+using namespace std::placeholders;
+
 BookmarkDialog::BookmarkDialog(QWidget * parent, Framework & framework)
   : QDialog(parent, Qt::WindowTitleHint | Qt::WindowSystemMenuHint)
   , m_framework(framework)
@@ -32,16 +29,16 @@ BookmarkDialog::BookmarkDialog(QWidget * parent, Framework & framework)
 
   QPushButton * closeButton = new QPushButton(tr("Close"), this);
   closeButton->setDefault(true);
-  connect(closeButton, SIGNAL(clicked()), this, SLOT(OnCloseClick()));
+  connect(closeButton, &QAbstractButton::clicked, this, &BookmarkDialog::OnCloseClick);
 
   QPushButton * deleteButton = new QPushButton(tr("Delete"), this);
-  connect(deleteButton, SIGNAL(clicked()), this, SLOT(OnDeleteClick()));
+  connect(deleteButton, &QAbstractButton::clicked, this, &BookmarkDialog::OnDeleteClick);
 
-  QPushButton * importButton = new QPushButton(tr("Import KML/KMZ"), this);
-  connect(importButton, SIGNAL(clicked()), this, SLOT(OnImportClick()));
+  QPushButton * importButton = new QPushButton(tr("Import KML, KMZ, GPX"), this);
+  connect(importButton, &QAbstractButton::clicked, this, &BookmarkDialog::OnImportClick);
 
   QPushButton * exportButton = new QPushButton(tr("Export KMZ"), this);
-  connect(exportButton, SIGNAL(clicked()), this, SLOT(OnExportClick()));
+  connect(exportButton, &QAbstractButton::clicked, this, &BookmarkDialog::OnExportClick);
 
   m_tree = new QTreeWidget(this);
   m_tree->setColumnCount(2);
@@ -49,7 +46,7 @@ BookmarkDialog::BookmarkDialog(QWidget * parent, Framework & framework)
   columnLabels << tr("Bookmarks and tracks") << "";
   m_tree->setHeaderLabels(columnLabels);
   m_tree->setSelectionBehavior(QAbstractItemView::SelectionBehavior::SelectItems);
-  connect(m_tree, SIGNAL(itemClicked(QTreeWidgetItem *, int)), this, SLOT(OnItemClick(QTreeWidgetItem *, int)));
+  connect(m_tree, &QTreeWidget::itemClicked, this, &BookmarkDialog::OnItemClick);
 
   QHBoxLayout * horizontalLayout = new QHBoxLayout();
   horizontalLayout->addStretch();
@@ -86,10 +83,12 @@ void BookmarkDialog::OnAsyncLoadingFinished()
 
 void BookmarkDialog::OnAsyncLoadingFileSuccess(std::string const & fileName, bool isTemporaryFile)
 {
+  LOG(LINFO, ("OnAsyncLoadingFileSuccess", fileName, isTemporaryFile));
 }
 
 void BookmarkDialog::OnAsyncLoadingFileError(std::string const & fileName, bool isTemporaryFile)
 {
+  LOG(LERROR, ("OnAsyncLoadingFileError", fileName, isTemporaryFile));
 }
 
 void BookmarkDialog::OnItemClick(QTreeWidgetItem * item, int column)
@@ -129,8 +128,8 @@ void BookmarkDialog::OnCloseClick()
 
 void BookmarkDialog::OnImportClick()
 {
-  auto const files = QFileDialog::getOpenFileNames(this /* parent */, tr("Open KML/KMZ..."),
-                                                   QString() /* dir */, "KML/KMZ files (*.kml *.kmz)");
+  auto const files = QFileDialog::getOpenFileNames(this /* parent */, tr("Open KML, KMZ, GPX..."),
+                                                   QString() /* dir */, "KML, KMZ, GPX files (*.kml *.KML *.kmz *.KMZ, *.gpx *.GPX)");
 
   for (auto const & name : files)
   {
@@ -144,7 +143,8 @@ void BookmarkDialog::OnImportClick()
 
 void BookmarkDialog::OnExportClick()
 {
-  if (m_tree->selectedItems().empty())
+  auto const selected = m_tree->selectedItems();
+  if (selected.empty())
   {
     QMessageBox ask(this);
     ask.setIcon(QMessageBox::Information);
@@ -154,7 +154,7 @@ void BookmarkDialog::OnExportClick()
     return;
   }
 
-  auto const categoryIt = m_categories.find(m_tree->selectedItems().front());
+  auto const categoryIt = m_categories.find(selected.front());
   if (categoryIt == m_categories.cend())
   {
     QMessageBox ask(this);
@@ -170,7 +170,7 @@ void BookmarkDialog::OnExportClick()
   if (name.isEmpty())
     return;
 
-  m_framework.GetBookmarkManager().PrepareFileForSharing(categoryIt->second,
+  m_framework.GetBookmarkManager().PrepareFileForSharing({categoryIt->second},
     [this, name](BookmarkManager::SharingResult const & result)
   {
     if (result.m_code == BookmarkManager::SharingResult::Code::Success)
@@ -191,13 +191,13 @@ void BookmarkDialog::OnExportClick()
       ask.addButton(tr("OK"), QMessageBox::NoRole);
       ask.exec();
     }
-  });
+  }, KmlFileType::Text);
 }
 
 void BookmarkDialog::OnDeleteClick()
 {
   auto & bm = m_framework.GetBookmarkManager();
-  for (auto item : m_tree->selectedItems())
+  for (auto const item : m_tree->selectedItems())
   {
     auto const categoryIt = m_categories.find(item);
     if (categoryIt != m_categories.cend())
@@ -212,7 +212,7 @@ void BookmarkDialog::OnDeleteClick()
       }
       else
       {
-        bm.GetEditSession().DeleteBmCategory(categoryIt->second);
+        bm.GetEditSession().DeleteBmCategory(categoryIt->second, true);
         FillTree();
       }
       return;
@@ -245,14 +245,11 @@ void BookmarkDialog::OnDeleteClick()
 QTreeWidgetItem * BookmarkDialog::CreateTreeItem(std::string const & title, QTreeWidgetItem * parent)
 {
   QStringList labels;
-  labels << QString(title.c_str()) << tr(parent != nullptr ? "Show on the map" : "");
+  labels << QString::fromStdString(title) << tr(parent != nullptr ? "Show on the map" : "");
 
-  QTreeWidgetItem * item = new QTreeWidgetItem(parent, labels);
-  item->setData(1, Qt::UserRole, QVariant(title.c_str()));
-  item->setData(2, Qt::UserRole, QVariant(tr(parent != nullptr ? "Show on the map" : "")));
-
-  if (parent == nullptr)
-    m_tree->addTopLevelItem(item);
+  QTreeWidgetItem * item = new QTreeWidgetItem(labels);
+  if (parent)
+    parent->addChild(item);
 
   return item;
 }
@@ -271,7 +268,7 @@ void BookmarkDialog::FillTree()
 
   if (!bm.IsAsyncLoadingInProgress())
   {
-    for (auto catId : bm.GetBmGroupsIdList())
+    for (auto catId : bm.GetUnsortedBmGroupsIdList())
     {
       auto categoryItem = CreateTreeItem(bm.GetCategoryName(catId), categoriesItem);
       m_categories[categoryItem] = catId;
@@ -284,10 +281,9 @@ void BookmarkDialog::FillTree()
         {
           name = measurement_utils::FormatLatLon(mercator::YToLat(bookmark->GetPivot().y),
                                                  mercator::XToLon(bookmark->GetPivot().x),
-                                                 true /* withSemicolon */);
+                                                 true /* withComma */);
         }
         auto bookmarkItem = CreateTreeItem(name + " (Bookmark)", categoryItem);
-        bookmarkItem->setTextColor(0, Qt::blue);
         m_bookmarks[bookmarkItem] = bookmarkId;
       }
 
@@ -298,7 +294,7 @@ void BookmarkDialog::FillTree()
         if (name.empty())
           name = "No name";
         auto trackItem = CreateTreeItem(name + " (Track)", categoryItem);
-        trackItem->setTextColor(0, Qt::darkGreen);
+        trackItem->setForeground(0, Qt::darkGreen);
         m_tracks[trackItem] = trackId;
       }
     }
@@ -308,7 +304,9 @@ void BookmarkDialog::FillTree()
     CreateTreeItem("Loading in progress...", categoriesItem);
   }
 
+  m_tree->addTopLevelItem(categoriesItem);
   m_tree->expandAll();
+  m_tree->setCurrentItem(categoriesItem);
 
   m_tree->header()->setSectionResizeMode(0, QHeaderView::Stretch);
   m_tree->header()->setSectionResizeMode(1, QHeaderView::ResizeToContents);

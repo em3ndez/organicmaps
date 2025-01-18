@@ -16,31 +16,30 @@ void IndexAndTypeMapping::Load(istream & s)
 {
   Classificator const & c = classif();
 
-  string v;
-  vector<string> path;
+  string line;
+  vector<string_view> path;
 
   uint32_t ind = 0;
   while (s.good())
   {
-    v.clear();
-    s >> v;
+    line.clear();
+    s >> line;
 
-    if (!v.empty())
+    if (!line.empty())
     {
-      path.clear();
+      std::string_view v = line;
 
       // Types can be deprecated with replacement, for deprecated type we have replacing type
       // in types.txt. We should use only main type for type index to ensure stable indices.
       // Main type description starts with '*' in types.txt.
-      auto const isMainTypeDescription = v[0] == '*';
+      auto const isMainTypeDescription = (v[0] == '*');
       if (isMainTypeDescription)
       {
         v = v.substr(1);
         CHECK(!v.empty(), (ind));
       }
-      strings::Tokenize(v, "|", base::MakeBackInsertFunctor(path));
 
-      Add(ind++, c.GetTypeByPath(path), isMainTypeDescription);
+      Add(ind++, c.GetTypeByPath(strings::Tokenize(v, "|")), isMainTypeDescription);
     }
   }
 }
@@ -60,6 +59,8 @@ void IndexAndTypeMapping::Add(uint32_t ind, uint32_t type, bool isMainTypeDescri
 uint32_t IndexAndTypeMapping::GetIndex(uint32_t t) const
 {
   Map::const_iterator i = m_map.find(t);
-  CHECK ( i != m_map.end(), (t, classif().GetFullObjectName(t)) );
+  /// @todo Should review each call of Classificator::GetIndexForType (see also IsTypeValid),
+  /// because this situation is possible for deleted dummy types in old maps data.
+  CHECK(i != m_map.end(), (t, classif().GetFullObjectName(t)));
   return i->second;
 }

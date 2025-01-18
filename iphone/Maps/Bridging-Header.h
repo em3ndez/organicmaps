@@ -2,15 +2,13 @@
 //  Use this file to import your target's public headers that you would like to expose to Swift.
 //
 
-@import Chart;
-
 #import "AuthenticationServices/AuthenticationServices.h"
 #import "CarPlay/CarPlay.h"
 #import "UIKit/UIKit.h"
 
 #import "private.h"
 
-#import <CoreApi/CoreApi-swift.h>
+#import <CoreApi/CoreApi.h>
 
 #import "DeepLinkRouteStrategyAdapter.h"
 #import "EAGLView.h"
@@ -32,6 +30,7 @@
 #import "MWMKeyboard.h"
 #import "MWMLocationManager.h"
 #import "MWMLocationModeListener.h"
+#import "MWMMailViewController.h"
 #import "MWMMapDownloaderButtonTableViewCell.h"
 #import "MWMMapDownloaderCellHeader.h"
 #import "MWMMapDownloaderLargeCountryTableViewCell.h"

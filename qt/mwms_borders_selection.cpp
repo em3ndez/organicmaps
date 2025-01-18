@@ -35,27 +35,27 @@ QGroupBox * MwmsBordersSelection::CreateButtonBoxGroup()
   groupBox->setLayout(vbox);
   groupBox->setFlat(true);
 
-  QObject::connect(buttonBox, SIGNAL(accepted()), this, SLOT(accept()));
-  QObject::connect(buttonBox, SIGNAL(rejected()), this, SLOT(reject()));
+  QObject::connect(buttonBox, &QDialogButtonBox::accepted, this, &QDialog::accept);
+  QObject::connect(buttonBox, &QDialogButtonBox::rejected, this, &QDialog::reject);
 
   return groupBox;
 }
 
-MwmsBordersSelection::Response MwmsBordersSelection::ShowModal()
+SelectionMode MwmsBordersSelection::ShowModal()
 {
   if (exec() != QDialog::Accepted)
-    return Response::Cancelled;
+    return SelectionMode::Cancelled;
 
   if (m_radioBordersFromData->isChecked())
   {
     if (m_radioJustBorders->isChecked())
-      return Response::MwmsBordersByPolyFiles;
+      return SelectionMode::MwmsBordersByPolyFiles;
 
     if (m_radioWithPoints->isChecked())
-      return Response::MwmsBordersWithVerticesByPolyFiles;
+      return SelectionMode::MwmsBordersWithVerticesByPolyFiles;
 
     if (m_radioBoundingBox->isChecked())
-      return Response::BoundingBoxByPolyFiles;
+      return SelectionMode::BoundingBoxByPolyFiles;
 
     UNREACHABLE();
   }
@@ -63,13 +63,13 @@ MwmsBordersSelection::Response MwmsBordersSelection::ShowModal()
   if (m_radioBordersFromPackedPolygon->isChecked())
   {
     if (m_radioJustBorders->isChecked())
-      return Response::MwmsBordersByPackedPolygon;
+      return SelectionMode::MwmsBordersByPackedPolygon;
 
     if (m_radioWithPoints->isChecked())
-      return Response::MwmsBordersWithVerticesByPackedPolygon;
+      return SelectionMode::MwmsBordersWithVerticesByPackedPolygon;
 
     if (m_radioBoundingBox->isChecked())
-      return Response::BoundingBoxByPackedPolygon;
+      return SelectionMode::BoundingBoxByPackedPolygon;
 
     UNREACHABLE();
   }

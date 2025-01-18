@@ -1,9 +1,6 @@
 project(track_analyzer)
 
-include_directories(${OMIM_ROOT}/3party/gflags/src)
-
-set(
-  SRC
+set(SRC
   cmd_balance_csv.cpp
   cmd_balance_csv.hpp
   cmd_cpp_track.cpp
@@ -22,30 +19,8 @@ set(
 
 omim_add_executable(${PROJECT_NAME} ${SRC})
 
-omim_link_libraries(
-  ${PROJECT_NAME}
+target_link_libraries(${PROJECT_NAME}
+  map
   track_analyzing
-  generator
-  routing
-  traffic
-  routing_common
-  storage
-  indexer
-  platform
-  mwm_diff
-  bsdiff
-  geometry
-  coding
-  base
-  icu
-  jansson
-  oauthcpp
-  opening_hours
-  protobuf
-  succinct
-  gflags
-  ${LIBZ}
+  gflags::gflags
 )
-
-link_qt5_core(${PROJECT_NAME})
-link_qt5_network(${PROJECT_NAME})

@@ -18,14 +18,14 @@ bool SpeedInUnits::operator==(SpeedInUnits const & rhs) const
   return m_speed == rhs.m_speed && m_units == rhs.m_units;
 }
 
-bool SpeedInUnits::operator<(SpeedInUnits const & rhs) const
-{
-  return ToSpeedKmPH(m_speed, m_units) < ToSpeedKmPH(rhs.m_speed, rhs.m_units);
-}
-
 bool SpeedInUnits::IsNumeric() const
 {
   return routing::IsNumeric(m_speed);
+}
+
+MaxspeedType SpeedInUnits::GetSpeedKmPH() const
+{
+  return static_cast<MaxspeedType>(ToSpeedKmPH(m_speed, m_units));
 }
 
 // Maxspeed ----------------------------------------------------------------------------------------
@@ -46,29 +46,21 @@ MaxspeedType Maxspeed::GetSpeedInUnits(bool forward) const
 
 MaxspeedType Maxspeed::GetSpeedKmPH(bool forward) const
 {
-  auto speedInUnits = GetSpeedInUnits(forward);
-  if (speedInUnits == kInvalidSpeed)
-    return kInvalidSpeed; // That means IsValid() returns false.
-
-  if (IsNumeric(speedInUnits))
-    return static_cast<MaxspeedType>(ToSpeedKmPH(speedInUnits, m_units));
-
-  // A feature is marked as a feature without any speed limits. (maxspeed=="none").
-  if (kNoneMaxSpeed)
+  auto const speedInUnits = GetSpeedInUnits(forward);
+  switch (speedInUnits)
   {
-    MaxspeedType constexpr kNoneSpeedLimitKmPH = 130;
-    return kNoneSpeedLimitKmPH;
-  }
+  case kInvalidSpeed: return kInvalidSpeed; // That means IsValid() returns false.
 
-  // If a feature is marked with the maxspeed=="walk" tag (speed == kWalkMaxSpeed) a driver
-  // should drive with a speed of a walking person.
-  if (kWalkMaxSpeed)
-  {
-    MaxspeedType constexpr kWalkSpeedLimitKmPH = 6;
-    return kWalkSpeedLimitKmPH;
-  }
+  // A feature is marked as a feature without any speed limits (maxspeed=="none").
+  // Should be less than CarModel::kMaxCarSpeedKMpH.
+  case kNoneMaxSpeed: return MaxspeedType{130};
 
-  UNREACHABLE();
+  // A feature is marked with the maxspeed=="walk" tag, a speed of a walking person.
+  case kWalkMaxSpeed: return MaxspeedType{6};
+
+  case kCommonMaxSpeedValue: return MaxspeedType{60};
+  }
+  return static_cast<MaxspeedType>(ToSpeedKmPH(speedInUnits, m_units));
 }
 
 // FeatureMaxspeed ---------------------------------------------------------------------------------
@@ -85,12 +77,12 @@ bool FeatureMaxspeed::operator==(FeatureMaxspeed const & rhs) const
 
 SpeedInUnits FeatureMaxspeed::GetForwardSpeedInUnits() const
 {
-  return SpeedInUnits(GetMaxspeed().GetForward(), GetMaxspeed().GetUnits());
+  return SpeedInUnits(m_maxspeed.GetForward(), m_maxspeed.GetUnits());
 }
 
 SpeedInUnits FeatureMaxspeed::GetBackwardSpeedInUnits() const
 {
-  return SpeedInUnits(GetMaxspeed().GetBackward(), GetMaxspeed().GetUnits());
+  return SpeedInUnits(m_maxspeed.GetBackward(), m_maxspeed.GetUnits());
 }
 
 // MaxspeedConverter -------------------------------------------------------------------------------
@@ -241,21 +233,21 @@ MaxspeedConverter::MaxspeedConverter()
   for (auto const & e : table)
     m_macroToSpeed[static_cast<uint8_t>(get<0>(e))] = SpeedInUnits(get<1>(e), get<2>(e));
 
-  CHECK_EQUAL(static_cast<uint8_t>(SpeedMacro::Undefined), 0, ());
+  ASSERT_EQUAL(static_cast<uint8_t>(SpeedMacro::Undefined), 0, ());
   m_speedToMacro.insert(make_pair(SpeedInUnits(kInvalidSpeed, Units::Metric), SpeedMacro::Undefined));
   for (size_t i = 1; i < numeric_limits<uint8_t>::max(); ++i)
   {
     auto const & speed = m_macroToSpeed[i];
-    if (!speed.IsValid())
-      continue;
-
-    m_speedToMacro.insert(make_pair(speed, static_cast<SpeedMacro>(i)));
+    if (speed.IsValid())
+      m_speedToMacro.insert(make_pair(speed, static_cast<SpeedMacro>(i)));
   }
 }
 
 SpeedInUnits MaxspeedConverter::MacroToSpeed(SpeedMacro macro) const
 {
-  return m_macroToSpeed[static_cast<uint8_t>(macro)];
+  uint8_t const m = static_cast<uint8_t>(macro);
+  ASSERT_LESS(m, m_macroToSpeed.size(), ());
+  return m_macroToSpeed[m];
 }
 
 SpeedMacro MaxspeedConverter::SpeedToMacro(SpeedInUnits const & speed) const
@@ -263,16 +255,12 @@ SpeedMacro MaxspeedConverter::SpeedToMacro(SpeedInUnits const & speed) const
   auto const it = m_speedToMacro.find(speed);
   if (it == m_speedToMacro.cend())
   {
-    // Note. On the feature emitting step we emit a maxspeed value with maxspeed:forward and
-    // maxspeed:backward only if forward and backward have the same units or one or two of them
-    // have a special value ("none", "walk"). So if forward maxspeed is in imperial units
-    // and backward maxspeed has a special value (like "none"), we may get a line is csv
-    // like this "100,Imperial,100,65534". Conditions below is written to process such edge cases
-    // correctly.
-    if (speed == SpeedInUnits(kNoneMaxSpeed, Units::Imperial))
-      return SpeedMacro::None;
-    if (speed == SpeedInUnits(kWalkMaxSpeed, Units::Imperial))
-      return SpeedMacro::Walk;
+    switch (speed.GetSpeed())
+    {
+    case kNoneMaxSpeed: return SpeedMacro::None;
+    case kWalkMaxSpeed: return SpeedMacro::Walk;
+    case kCommonMaxSpeedValue: return SpeedMacro::Speed60KmPH;
+    }
 
     return SpeedMacro::Undefined;
   }
@@ -280,10 +268,35 @@ SpeedMacro MaxspeedConverter::SpeedToMacro(SpeedInUnits const & speed) const
   return it->second;
 }
 
-bool MaxspeedConverter::IsValidMacro(uint8_t macro) const
+SpeedInUnits MaxspeedConverter::ClosestValidMacro(SpeedInUnits const & speed) const
 {
-  CHECK_LESS(macro, numeric_limits<uint8_t>::max(), ());
-  return m_macroToSpeed[macro].IsValid();
+  auto it = m_speedToMacro.lower_bound(speed);
+  if (it == m_speedToMacro.end())
+  {
+    --it;
+  }
+  else if (speed == it->first)
+  {
+    return speed;
+  }
+  else if (it != m_speedToMacro.begin())
+  {
+    auto it2 = it;
+    --it2;
+
+    ASSERT(speed.GetUnits() == it->first.GetUnits() || speed.GetUnits() == it2->first.GetUnits(), ());
+    auto const Diff = [&speed](SpeedInUnits const & rhs)
+    {
+      if (speed.GetUnits() != rhs.GetUnits())
+        return std::numeric_limits<int>::max();
+      return abs(int(rhs.GetSpeed()) - int(speed.GetSpeed()));
+    };
+
+    if (Diff(it2->first) < Diff(it->first))
+      it = it2;
+  }
+
+  return it->first;
 }
 
 // static
@@ -303,46 +316,57 @@ bool HaveSameUnits(SpeedInUnits const & lhs, SpeedInUnits const & rhs)
   return lhs.GetUnits() == rhs.GetUnits() || !lhs.IsNumeric() || !rhs.IsNumeric();
 }
 
-bool IsFeatureIdLess(FeatureMaxspeed const & lhs, FeatureMaxspeed const & rhs)
-{
-  return lhs.IsFeatureIdLess(rhs);
-}
-
 bool IsNumeric(MaxspeedType speed)
 {
-  return speed != kNoneMaxSpeed && speed != kWalkMaxSpeed && speed != kInvalidSpeed;
+  return (speed != kInvalidSpeed && speed != kNoneMaxSpeed &&
+          speed != kWalkMaxSpeed && speed != kCommonMaxSpeedValue);
 }
+
+namespace
+{
+std::string PrintMaxspeedType(MaxspeedType s)
+{
+  switch (s)
+  {
+  case kInvalidSpeed: return "Invalid";
+  case kNoneMaxSpeed: return "None";
+  case kWalkMaxSpeed: return "Walk";
+  case kCommonMaxSpeedValue: return "Common";
+  }
+  return std::to_string(int(s));
+}
+} // namespace
 
 string DebugPrint(Maxspeed maxspeed)
 {
   ostringstream oss;
-  oss << "Maxspeed [ m_units:" << DebugPrint(maxspeed.GetUnits())
-      << " m_forward:" << maxspeed.GetForward()
-      << " m_backward:" << maxspeed.GetBackward() << " ]";
+  oss << "Maxspeed { m_units: " << DebugPrint(maxspeed.GetUnits())
+      << ", m_forward: " << PrintMaxspeedType(maxspeed.GetForward())
+      << ", m_backward: " << PrintMaxspeedType(maxspeed.GetBackward()) << " }";
   return oss.str();
 }
 
 string DebugPrint(SpeedMacro maxspeed)
 {
   ostringstream oss;
-  oss << "SpeedMacro:" << static_cast<int>(maxspeed) << " Decoded:"
-      << DebugPrint(GetMaxspeedConverter().MacroToSpeed(maxspeed));
+  oss << "SpeedMacro { " << static_cast<int>(maxspeed) << ", decoded: "
+      << DebugPrint(GetMaxspeedConverter().MacroToSpeed(maxspeed)) << " }";
   return oss.str();
 }
 
 string DebugPrint(SpeedInUnits const & speed)
 {
   ostringstream oss;
-  oss << "SpeedInUnits [ m_speed == " << speed.GetSpeed()
-      << ", m_units:" << DebugPrint(speed.GetUnits()) << " ]";
+  oss << "SpeedInUnits { m_speed: " << PrintMaxspeedType(speed.GetSpeed())
+      << ", m_units: " << DebugPrint(speed.GetUnits()) << " }";
   return oss.str();
 }
 
 string DebugPrint(FeatureMaxspeed const & featureMaxspeed)
 {
   ostringstream oss;
-  oss << "FeatureMaxspeed [ m_featureId:" << featureMaxspeed.GetFeatureId()
-      << " m_maxspeed:" << DebugPrint(featureMaxspeed.GetMaxspeed()) << " ]";
+  oss << "FeatureMaxspeed { m_featureId: " << featureMaxspeed.GetFeatureId()
+      << ", m_maxspeed: " << DebugPrint(featureMaxspeed.GetMaxspeed()) << " }";
   return oss.str();
 }
 }  // namespace routing

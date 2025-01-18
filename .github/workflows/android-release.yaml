@@ -1,14 +1,66 @@
 name: Android Release
 on:
-  push:
-    tags:
-      - '202[0-9].[0-9]+.[0-9]+-[0-9]+-android' # 2021.08.03-1-android
+  workflow_dispatch:  # Manual trigger
+
+env:
+  RELEASE_NOTES: android/app/src/google/play/release-notes/en-US/default.txt
+  FDROID_VERSION: android/app/src/fdroid/play/version.yaml
+  JAVA_HOME: /usr/lib/jvm/temurin-17-jdk-amd64  # Java 17 is required for Android Gradle 8 plugin
 
 jobs:
+  tag:
+    name: Tag
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 100  # Enough to get all commits for the last day.
+          ssh-key: ${{ secrets.RELEASE_SSH_KEY }}
+
+      - name: Tag
+        id: tag
+        shell: bash
+        run: |
+          set -x
+          git config user.name '${{ github.actor }}'
+          git config user.email '${{ github.actor }}@users.noreply.github.com'
+          version=$(tools/unix/version.sh ios_version)
+          # +1 because below a "Bump versions" commit is created.
+          # TODO: Find a way to refactor FDroid versioning without that additional commit.
+          build=$(($(tools/unix/version.sh ios_build) + 1))
+          code=$(($(tools/unix/version.sh android_code) + 1))
+          tag=$version-$build-android
+          echo "::set-output name=version::$version"
+          echo "::set-output name=build::$build"
+          echo "::set-output name=tag::$tag"
+          echo "::set-output name=code::$code"
+          echo "version: ${version}-${build}-FDroid+${code}" > ${{ env.FDROID_VERSION }}
+          git add ${{ env.FDROID_VERSION }}
+          {
+            echo $tag
+            echo
+            cat ${{ env.RELEASE_NOTES }}
+          } > ${{ runner.temp }}/tag.txt
+          branch="${GITHUB_REF#refs/heads/}"
+          test -n "$branch"
+          git commit -m "Bump versions" -s
+          git tag -a $tag -F ${{ runner.temp }}/tag.txt
+          git show $tag
+          git push origin $branch:$branch
+          git push origin $tag:$tag
+    outputs:
+      version: ${{ steps.tag.outputs.version }}
+      build: ${{ steps.tag.outputs.build }}
+      code: ${{ steps.tag.outputs.code }}
+      tag: ${{ steps.tag.outputs.tag }}
+
   android-release:
     name: Android Release
     runs-on: ubuntu-latest
     environment: production
+    needs: tag
     strategy:
       fail-fast: false
       matrix:
@@ -23,35 +75,55 @@ jobs:
           sudo apt-get update -y
           sudo apt-get install -y ninja-build
 
-      - name: Set up JDK 1.8
-        uses: actions/setup-java@v1
-        with:
-          java-version: 1.8
-
       - name: Checkout sources
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 100 # enough to get all commits for the current day
+          ref: 'refs/tags/${{ needs.tag.outputs.tag }}'
+
+      - name: Check tag
+        shell: bash
+        run: |
+          git show HEAD
+          test -n "${{ needs.tag.outputs.tag }}"
+          test "$(git tag --points-at HEAD)" = "${{ needs.tag.outputs.tag }}"
 
       - name: Parallel submodules checkout
         shell: bash
-        run: git submodule update --init --recursive --jobs=$(($(nproc) * 2))
+        run: git submodule update --depth 1 --init --recursive --jobs=$(($(nproc) * 20))
 
-      - name: Checkout private keys
-        uses: actions/checkout@v2
+      - name: Checkout screenshots
+        uses: actions/checkout@v4
         with:
-          repository: ${{ secrets.PRIVATE_REPO }}
-          ssh-key: ${{ secrets.PRIVATE_SSH_KEY }}
+          repository: ${{ secrets.SCREENSHOTS_REPO }}
+          ssh-key: ${{ secrets.SCREENSHOTS_SSH_KEY }}
           ref: master
-          path: private.git
+          path: screenshots
 
-      - name: Configure repo with private keys
+      - name: Restore release keys
         shell: bash
         run: |
-          ./configure.sh ./private.git
-          rm -rf ./private.git
+          echo "$PRIVATE_H" | base64 -d > private.h
+          echo "$GOOGLE_PLAY_JSON" | base64 -d > android/app/google-play.json
+          echo "$HUAWEI_APPGALLERY_JSON" | base64 -d > android/app/huawei-appgallery.json
+          echo "$AGCONNECT_SERVICES_JSON" | base64 -d > android/app/agconnect-services.json
+          echo "$SECURE_PROPERTIES" | base64 -d > android/app/secure.properties
+          echo "$RELEASE_KEYSTORE" | base64 -d > android/app/release.keystore
+        env:
+          PRIVATE_H: ${{ secrets.PRIVATE_H }}
+          GOOGLE_PLAY_JSON: ${{ secrets.GOOGLE_PLAY_JSON }}
+          HUAWEI_APPGALLERY_JSON: ${{ secrets.HUAWEI_APPGALLERY_JSON }}
+          AGCONNECT_SERVICES_JSON: ${{ secrets.AGCONNECT_SERVICES_JSON }}
+          SECURE_PROPERTIES: ${{ secrets.SECURE_PROPERTIES }}
+          RELEASE_KEYSTORE: ${{ secrets.RELEASE_KEYSTORE }}
+
+      - name: Configure repository
+        shell: bash
+        run: ./configure.sh
 
       - name: Set up SDK
         shell: bash
-        run: (cd tools/android; ./set_up_android.py --sdk $ANDROID_SDK_ROOT)
+        run: echo "sdk.dir=$ANDROID_SDK_ROOT" > android/local.properties
 
       - name: Compile and upload to Google Play
         shell: bash
@@ -75,10 +147,34 @@ jobs:
           ./gradlew assembleWebRelease
         if: ${{ matrix.flavor == 'web' }}
 
+      - name: Prepare release notes
+        if: ${{ matrix.flavor == 'web' }}
+        shell: bash
+        run: |
+          (cd ./android/app/build/outputs/apk/web/release/ && sha256sum OrganicMaps-${{ needs.tag.outputs.code }}-web-release.apk > OrganicMaps-${{ needs.tag.outputs.code }}-web-release.apk.sha256sum)
+          {
+            cat ${{ env.RELEASE_NOTES }}
+            echo ""
+            echo "See [a detailed announce](https://organicmaps.app/news/) on our website when app updates are published in all stores."
+            echo "You can get automatic app updates from GitHub [using Obtainium](https://github.com/organicmaps/organicmaps/wiki/Installing-Organic-Maps-from-GitHub-using-Obtainium)."
+            echo ""
+            echo "sha256sum:"
+            echo -e '\n```'
+            tr -d '\n' < ./android/app/build/outputs/apk/web/release/OrganicMaps-${{ needs.tag.outputs.code }}-web-release.apk.sha256sum
+            echo -e '\n```'
+          } > ${{ runner.temp }}/release-notes.txt
+
       - name: Upload universal APK to GitHub
-        uses: actions/upload-artifact@v2
+        uses: softprops/action-gh-release@v1
         if: ${{ matrix.flavor == 'web' }}
         with:
-          name: web-release-apk
-          path: ./android/build/outputs/apk/web/release/OrganicMaps-*-web-release.apk
-          if-no-files-found: error
+          body_path: ${{ runner.temp }}/release-notes.txt
+          token: ${{ secrets.GITHUB_TOKEN }}
+          name: ${{ needs.tag.outputs.tag }}
+          tag_name: ${{ needs.tag.outputs.tag }}
+          discussion_category_name: 'Announcements'
+          prerelease: true
+          files: |
+            ./android/app/build/outputs/apk/web/release/OrganicMaps-${{ needs.tag.outputs.code }}-web-release.apk
+            ./android/app/build/outputs/apk/web/release/OrganicMaps-${{ needs.tag.outputs.code }}-web-release.apk.sha256sum
+          fail_on_unmatched_files: true

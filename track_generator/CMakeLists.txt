@@ -1,11 +1,6 @@
 project(track_generator_tool)
 
-include_directories(
-  ${OMIM_ROOT}/3party/gflags/src
-)
-
-set(
-  SRC
+set(SRC
   track_generator_tool.cpp
   utils.cpp
   utils.hpp
@@ -13,30 +8,11 @@ set(
 
 omim_add_executable(${PROJECT_NAME} ${SRC})
 
-omim_link_libraries(
-  ${PROJECT_NAME}
-  routing_quality
+target_link_libraries(${PROJECT_NAME}
   routes_builder
   routing
-  routing_common
   kml
-  storage
-  indexer
-  platform
-  mwm_diff
-  bsdiff
-  geometry
   coding
-  base
-  icu
-  expat
-  oauthcpp
-  protobuf
-  opening_hours
-  succinct
-  gflags
-  ${LIBZ}
+  expat::expat
+  gflags::gflags
 )
-
-link_qt5_core(${PROJECT_NAME})
-link_qt5_network(${PROJECT_NAME})

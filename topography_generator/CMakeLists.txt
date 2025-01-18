@@ -1,11 +1,6 @@
 project(topography_generator_tool)
 
-include_directories(
-  ${OMIM_ROOT}/3party/gflags/src
-)
-
-set(
-  SRC
+set(SRC
   filters_impl.cpp
   filters_impl.hpp
   generator.cpp
@@ -25,26 +20,11 @@ set(
 
 omim_add_executable(${PROJECT_NAME} ${SRC})
 
-omim_link_libraries(
-  ${PROJECT_NAME}
+target_link_libraries(${PROJECT_NAME}
   generator
-  routing
-  routing_common
-  traffic
   storage
-  platform
   indexer
-  geometry
+  platform
   coding
-  base
-  oauthcpp
-  expat
-  jansson
-  protobuf
-  minizip
-  icu
-  gflags
-  ${LIBZ}
+  gflags::gflags
 )
-
-link_qt5_core(${PROJECT_NAME})
